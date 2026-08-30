@@ -2,6 +2,12 @@ import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
 import axios from "axios";
 
+const GetWeatherResultSchema = z.object({
+  city: z.string().describe("name of the city"),
+  degree_c: z.number().describe("the degree celcius of the temp"),
+  condition: z.string().optional().describe("condition of the weather"),
+});
+
 const getWeatherTool = tool({
   name: "get_weather",
   description: "returns the current weather information for the given city",
@@ -11,7 +17,12 @@ const getWeatherTool = tool({
   execute: async function ({ city }) {
     const url = `https://wttr.in/${city.toLowerCase()}?format=%C+%t`;
     const reponse = await axios.get(url, { responseType: "text" });
-    return reponse.data;
+    const [condition, degree_c] = reponse.data.split(" ");
+    return GetWeatherResultSchema.parse({
+      city,
+      degree_c: parseFloat(degree_c),
+      condition,
+    });
   },
 });
 
@@ -23,12 +34,12 @@ const sendEmailTool = tool({
     subject: z.string().describe("subject of the email"),
     body: z.string().describe("body of the email"),
   }),
-  execute: async function ({ email, subject, body }) {
+  execute: async function ({ toemail, subject, body }) {
     // Simulate sending an email
     console.log(
-      `Sending email to ${email} with subject "${subject}" and body "${body}"`,
+      `Sending email to ${toemail} with subject "${subject}" and body "${body}"`,
     );
-    return `Email sent to ${email}`;
+    return `Email sent to ${toemail}`;
   },
 });
 
@@ -37,6 +48,7 @@ const agent = new Agent({
   instructions:
     "You are an expert weather agent that helps user to tell weather report",
   tools: [getWeatherTool, sendEmailTool],
+  outputType: GetWeatherResultSchema,
 });
 
 async function main(query = "") {
